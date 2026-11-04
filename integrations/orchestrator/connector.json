@@ -1,0 +1,12 @@
+{
+  "name": "stylelock",
+  "description": "Style-locked image generation for one art project",
+  "transport": "stdio",
+  "command": "stylelock",
+  "args": ["mcp", "--project", "/ABSOLUTE/PATH/TO/ART-PROJECT", "--max-images", "40"],
+  "env": {
+    "STYLELOCK_PROVIDER": "openai",
+    "STYLELOCK_MODEL": "gpt-image-1.5",
+    "OPENAI_API_KEY": "<inject from the orchestrator's secret store - never commit a real key>"
+  }
+}

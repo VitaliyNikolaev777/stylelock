@@ -85,7 +85,7 @@ def status() -> dict:
     if not anchors:
         next_steps.append("register 2-5 approved on-style images as anchors")
     caps = gen["capabilities"] or {}
-    if gen["provider"] == "dryrun":
+    if gen["provider"] == "dryrun" and gen["sources"]["provider"] == "default":
         next_steps.append("no provider configured - set STYLELOCK_PROVIDER (dryrun makes placeholders)")
     elif not caps.get("key_set", True):
         next_steps.append(f"{caps.get('key_env')} is not set for provider {gen['provider']}")

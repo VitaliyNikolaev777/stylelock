@@ -1,0 +1,13 @@
+{
+  "name": "stylelock-local-model",
+  "description": "Style-locked image generation through an OpenAI-compatible server (proxy or local model)",
+  "transport": "stdio",
+  "command": "stylelock",
+  "args": ["mcp", "--project", "/ABSOLUTE/PATH/TO/ART-PROJECT", "--max-images", "40"],
+  "env": {
+    "STYLELOCK_PROVIDER": "openai-compatible",
+    "STYLELOCK_MODEL": "<model id the server expects>",
+    "STYLELOCK_COMPAT_BASE_URL": "http://localhost:4000/v1",
+    "STYLELOCK_COMPAT_API_KEY": "<only if the server wants one>"
+  }
+}

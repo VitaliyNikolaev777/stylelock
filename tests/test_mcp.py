@@ -164,3 +164,33 @@ def test_real_stdio_session(project):
     assert tools == EXPECTED_TOOLS
     assert data(st)["budget"]["max_images"] == 3
     assert not gen.is_error and (project / "outputs").glob("*.png")
+
+
+def test_orchestrator_folder_matches_the_server():
+    """integrations/orchestrator/ ships copies of the instructions and tool schemas."""
+    import importlib.util
+    from pathlib import Path
+
+    here = Path(__file__).resolve().parents[1] / "integrations" / "orchestrator"
+    spec = importlib.util.spec_from_file_location("regen", here / "regenerate.py")
+    regen = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(regen)
+    for name, text in regen.current().items():
+        assert (here / name).read_text() == text, f"{name} is stale - run regenerate.py"
+
+
+def test_connector_templates_are_valid_and_hold_no_key():
+    from pathlib import Path
+
+    from stylelock.providers import REGISTRY
+
+    here = Path(__file__).resolve().parents[1] / "integrations" / "orchestrator"
+    files = sorted(here.glob("connector*.json"))
+    assert len(files) == 3
+    for f in files:
+        c = json.loads(f.read_text())
+        assert c["command"] == "stylelock" and c["args"][0] == "mcp" and "--project" in c["args"]
+        assert c["env"]["STYLELOCK_PROVIDER"] in REGISTRY
+        for k, v in c["env"].items():
+            if k.endswith(("_KEY", "_TOKEN")):
+                assert v.startswith("<"), f"{f.name}: {k} looks like a real key"

@@ -1,0 +1,10 @@
+{
+  "name": "stylelock-readonly",
+  "description": "Browse a stylelock project: guide, references, prompts, review - no generation",
+  "transport": "stdio",
+  "command": "stylelock",
+  "args": ["mcp", "--project", "/ABSOLUTE/PATH/TO/ART-PROJECT", "--max-images", "0"],
+  "env": {
+    "STYLELOCK_PROVIDER": "dryrun"
+  }
+}

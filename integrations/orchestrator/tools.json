@@ -1,0 +1,529 @@
+[
+  {
+    "name": "status",
+    "description": "Project, style guide, reference library and the configured image provider/model with its capabilities. Call this first.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "title": "statusArguments"
+    }
+  },
+  {
+    "name": "style_info",
+    "description": "The types (what kind of asset), variants (which world) and cast (recurring characters) the guide offers, with descriptions.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "style_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Style Version"
+        }
+      },
+      "title": "style_infoArguments"
+    }
+  },
+  {
+    "name": "preview_prompt",
+    "description": "Assemble the exact prompt and reference set for a brief without generating anything. Free. Use before any new kind of brief.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "subject": {
+          "title": "Subject",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type"
+        },
+        "variant": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Variant"
+        },
+        "character": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Character"
+        },
+        "extra": {
+          "default": "",
+          "title": "Extra",
+          "type": "string"
+        },
+        "style_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Style Version"
+        },
+        "roles": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Roles"
+        },
+        "tags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tags"
+        },
+        "ref_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref Ids"
+        }
+      },
+      "required": [
+        "subject"
+      ],
+      "title": "preview_promptArguments"
+    }
+  },
+  {
+    "name": "generate",
+    "description": "Generate n images (max 4) through the style lock. `subject` is what to depict, never how it looks; per-image direction goes in `extra`. Provider and model are fixed by the host. Returns a summary per image plus a preview of each.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "subject": {
+          "title": "Subject",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type"
+        },
+        "variant": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Variant"
+        },
+        "character": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Character"
+        },
+        "extra": {
+          "default": "",
+          "title": "Extra",
+          "type": "string"
+        },
+        "n": {
+          "default": 1,
+          "title": "N",
+          "type": "integer"
+        },
+        "style_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Style Version"
+        },
+        "roles": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Roles"
+        },
+        "tags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tags"
+        },
+        "ref_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref Ids"
+        },
+        "allow_draft": {
+          "default": false,
+          "title": "Allow Draft",
+          "type": "boolean"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Options"
+        },
+        "preview_size": {
+          "default": 512,
+          "title": "Preview Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "subject"
+      ],
+      "title": "generateArguments"
+    }
+  },
+  {
+    "name": "view_image",
+    "description": "Show an image from the project at up to max_side pixels. Transparent images are drawn over a checkerboard unless checker=false.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "max_side": {
+          "default": 1024,
+          "title": "Max Side",
+          "type": "integer"
+        },
+        "checker": {
+          "default": true,
+          "title": "Checker",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "view_imageArguments"
+    }
+  },
+  {
+    "name": "list_pending",
+    "description": "Generated images not yet accepted or rejected.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "title": "list_pendingArguments"
+    }
+  },
+  {
+    "name": "accept",
+    "description": "Mark an image accepted (on-style and on-brief).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "acceptArguments"
+    }
+  },
+  {
+    "name": "reject",
+    "description": "Reject an image with one or more reasons from review_reasons, plus a precise note. Moves it to rejects/ and logs it.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "reasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reasons",
+          "type": "array"
+        },
+        "note": {
+          "default": "",
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "reasons"
+      ],
+      "title": "rejectArguments"
+    }
+  },
+  {
+    "name": "review_reasons",
+    "description": "The fixed vocabulary of reject reasons.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "title": "review_reasonsArguments"
+    }
+  },
+  {
+    "name": "review_report",
+    "description": "Aggregate the reject log into suggested guide changes.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "min_hits": {
+          "default": 3,
+          "title": "Min Hits",
+          "type": "integer"
+        }
+      },
+      "title": "review_reportArguments"
+    }
+  },
+  {
+    "name": "list_references",
+    "description": "The reference library (anchors and role references).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "roles": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Roles"
+        },
+        "tags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tags"
+        }
+      },
+      "title": "list_referencesArguments"
+    }
+  },
+  {
+    "name": "add_reference",
+    "description": "Register an image from inside the project as a reference. Anchors must be purely on-style; partly-right images go in as texture/composition/palette/subject with `exclude`.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "demonstrates": {
+          "title": "Demonstrates",
+          "type": "string"
+        },
+        "role": {
+          "default": "anchor",
+          "title": "Role",
+          "type": "string"
+        },
+        "tags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tags"
+        },
+        "exclude": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exclude"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Id"
+        }
+      },
+      "required": [
+        "path",
+        "demonstrates"
+      ],
+      "title": "add_referenceArguments"
+    }
+  },
+  {
+    "name": "read_doc",
+    "description": "Read guidance: agent, briefing, guides, post-processing, review, one-offs.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "read_docArguments"
+    }
+  }
+]

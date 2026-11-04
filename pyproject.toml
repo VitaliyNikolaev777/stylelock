@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stylelock"
+version = "0.1.0"
+description = "Style-locked image generation: a versioned style spec, curated anchors and a provenance sidecar on every image"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+openai = ["openai>=1.40"]
+gemini = ["google-genai>=1.0"]
+replicate = ["replicate>=1.0"]
+tools = ["pillow>=10.0"]
+dev = ["pytest>=8.0"]
+all = ["openai>=1.40", "google-genai>=1.0", "replicate>=1.0", "pillow>=10.0"]
+
+[project.scripts]
+stylelock = "stylelock.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+stylelock = ["templates/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,11 @@
+{
+  "name": "stylelock",
+  "owner": { "name": "Vitalii Nikolaev" },
+  "plugins": [
+    {
+      "name": "stylelock",
+      "source": "./",
+      "description": "Style-locked image generation with a versioned style guide, curated anchors and a review loop."
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "stylelock",
+  "version": "0.1.0",
+  "description": "Style-locked image generation: Claude plans, briefs and reviews; the stylelock CLI injects a versioned style spec and reference anchors into every image-model call and records provenance.",
+  "author": { "name": "Vitalii Nikolaev" },
+  "repository": "https://github.com/VitaliyNikolaev777/stylelock",
+  "license": "MIT",
+  "keywords": ["image-generation", "style-guide", "illustration", "gpt-image", "assets"]
+}

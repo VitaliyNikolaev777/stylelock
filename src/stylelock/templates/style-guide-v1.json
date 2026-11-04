@@ -1,0 +1,122 @@
+{
+  "$schema": "./style-guide.schema.json",
+  "id": "my-style",
+  "version": "1.0.0",
+  "status": "draft",
+  "updated": "",
+  "notes": [
+    "Starter guide written by `stylelock init`. Every value below is a placeholder for a clean flat-vector look - replace them with a description of YOUR approved art, then set status to active.",
+    "Describe what the art IS, measured from real approved images, not what you hope it will be. Pull palette hexes from the files themselves.",
+    "Once active this file is immutable: change the style with `stylelock style bump`."
+  ],
+  "subject_domain": "illustrations for a product - say what they are for and who sees them",
+  "palette": {
+    "description": "a small fixed palette of saturated, friendly colours",
+    "colors": [
+      {"name": "ink navy", "hex": "#1F2A44", "role": "darkest value, used sparingly for depth"},
+      {"name": "sky blue", "hex": "#4FA3E0", "role": "primary"},
+      {"name": "leaf green", "hex": "#3DBE7A", "role": "secondary"},
+      {"name": "sun yellow", "hex": "#FFC93C", "role": "accent - small areas only"},
+      {"name": "coral", "hex": "#FF6B5B", "role": "accent - small areas only"},
+      {"name": "paper white", "hex": "#FAF7F0", "role": "light value and highlights"}
+    ],
+    "rules": [
+      "accents cover well under a tenth of the image",
+      "no colours outside the palette apart from lighter and darker steps of its own hues"
+    ]
+  },
+  "rendering": {
+    "medium": "flat vector illustration",
+    "line_weight": "no outlines - shapes are defined by fills alone",
+    "detail_level": "simplified, readable at small sizes",
+    "texture": "none - clean flat fills",
+    "edge_treatment": "crisp, slightly rounded corners",
+    "shading": "one or two flat tone steps per shape, no gradients"
+  },
+  "lighting": {
+    "key": "soft, even daylight from the upper left",
+    "contrast": "medium",
+    "avoid": "glow, bloom, rim light or dramatic shadows"
+  },
+  "camera": {
+    "lens_language": "straight-on or gentle three-quarter view",
+    "framing": "subject comfortably inside the frame",
+    "depth_of_field": "everything sharp"
+  },
+  "composition": {
+    "structure": "one clear focal subject",
+    "negative_space": "generous",
+    "background": "simple and quieter than the subject",
+    "balance": "stable, slightly off-centre"
+  },
+  "mood": {
+    "adjectives": ["friendly", "calm", "optimistic"],
+    "avoid_adjectives": ["gloomy", "aggressive", "cluttered"]
+  },
+  "avoid": [
+    "outlines or ink contours",
+    "photorealism, 3D renders, clay or plastic materials",
+    "gradients, glow, lens flare",
+    "paper grain, noise, brush texture",
+    "watermarks, logos, UI chrome"
+  ],
+  "hard_rules": [
+    "there is no text anywhere in the image - no words, letters, numerals, captions, labels, signage or logos"
+  ],
+  "prompt": {
+    "template": "{subject}\n\n{style_block}",
+    "prefix": "",
+    "suffix": "",
+    "style_block_order": ["medium", "rendering", "palette", "lighting", "camera", "composition", "characters", "cast", "mood", "avoid"],
+    "negative": ["photorealistic", "3d render", "outline", "gradient", "glow", "noise", "text", "letters", "words", "watermark", "logo"]
+  },
+  "types": {
+    "scene": {
+      "description": "A full-bleed background illustration.",
+      "composition": {
+        "structure": "a complete environment filling the whole canvas, edge to edge",
+        "negative_space": "calm areas where interface elements can sit",
+        "background": "the scene itself - no border, no vignette",
+        "balance": "even weight across the frame"
+      }
+    },
+    "object": {
+      "description": "A single prop or character isolated on a transparent background, for compositing.",
+      "composition": {
+        "structure": "one subject, complete and unclipped, centred",
+        "negative_space": "fully transparent background",
+        "background": "none at all; alpha transparency only",
+        "balance": "centred and upright"
+      },
+      "append": "Draw ONE subject only, complete and centred on a fully transparent background. No ground plane, no cast shadow, no scenery, no backdrop.",
+      "provider_defaults": {
+        "openai": {"size": "1024x1024", "background": "transparent", "output_format": "png"}
+      }
+    },
+    "icon": {
+      "description": "A square interface icon on a transparent background.",
+      "composition": {
+        "structure": "one bold symbol, centred, filling about 80% of the canvas",
+        "negative_space": "fully transparent around the symbol",
+        "background": "none at all; alpha transparency only",
+        "balance": "centred"
+      },
+      "append": "One bold, instantly readable symbol. No background shape unless the guide asks for one.",
+      "provider_defaults": {
+        "openai": {"size": "1024x1024", "background": "transparent", "output_format": "png"}
+      }
+    }
+  },
+  "variants": {},
+  "cast": {},
+  "references": {
+    "anchor_limit": 5,
+    "default_roles": ["anchor"],
+    "notes": "Anchors are sent with every call. Add 2-5 of your best on-style images with `stylelock refs add <file> --role anchor --demonstrates '...'`."
+  },
+  "provider_defaults": {
+    "openai": {"model": "gpt-image-1.5", "size": "1536x1024", "quality": "high"},
+    "gemini": {"model": "gemini-3-pro-image", "aspect_ratio": "16:9"},
+    "replicate": {"model": "black-forest-labs/flux-1.1-pro", "aspect_ratio": "16:9", "output_format": "png"}
+  }
+}

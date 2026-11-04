@@ -1,0 +1,5 @@
+.env
+outputs/
+rejects/*.png
+rejects/*.webp
+rejects/*.jpg

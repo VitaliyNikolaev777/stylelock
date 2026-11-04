@@ -1,0 +1,243 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "stylelock style guide",
+  "type": "object",
+  "required": [
+    "id",
+    "version",
+    "status",
+    "palette",
+    "rendering",
+    "avoid",
+    "prompt",
+    "hard_rules"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "active",
+        "deprecated"
+      ]
+    },
+    "updated": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "subject_domain": {
+      "type": "string"
+    },
+    "palette": {
+      "type": "object",
+      "required": [
+        "colors"
+      ],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "colors": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "hex"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "hex": {
+                "type": "string",
+                "pattern": "^#[0-9A-Fa-f]{6}$"
+              },
+              "role": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "rendering": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "lighting": {
+      "type": "object"
+    },
+    "camera": {
+      "type": "object"
+    },
+    "composition": {
+      "type": "object"
+    },
+    "mood": {
+      "type": "object"
+    },
+    "avoid": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "prompt": {
+      "type": "object",
+      "required": [
+        "template"
+      ],
+      "properties": {
+        "template": {
+          "type": "string"
+        },
+        "prefix": {
+          "type": "string"
+        },
+        "suffix": {
+          "type": "string"
+        },
+        "style_block_order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "negative": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "references": {
+      "type": "object"
+    },
+    "provider_defaults": {
+      "type": "object"
+    },
+    "hard_rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      },
+      "description": "Absolute constraints. Rendered on every prompt after all other sections; no variant or type may override them."
+    },
+    "characters": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "variants": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "reference_tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reference_roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "append": {
+            "type": "string"
+          },
+          "negative": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "provider_defaults": {
+            "type": "object"
+          }
+        },
+        "not": {
+          "required": [
+            "hard_rules"
+          ]
+        }
+      }
+    },
+    "types": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "reference_tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reference_roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "append": {
+            "type": "string"
+          },
+          "negative": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "provider_defaults": {
+            "type": "object"
+          }
+        },
+        "not": {
+          "required": [
+            "hard_rules"
+          ]
+        }
+      }
+    }
+  }
+}

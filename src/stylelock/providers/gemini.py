@@ -18,6 +18,18 @@ class GeminiProvider(Provider):
     name = "gemini"
     supports_reference_images = True
     supports_negative_prompt = False
+    supports_transparency = False
+    key_env = "GEMINI_API_KEY"
+    default_model = "gemini-3-pro-image"
+    notes = "also reads GOOGLE_API_KEY; one image per call; no alpha channel"
+
+    @classmethod
+    def describe(cls) -> dict:
+        import os
+
+        d = super().describe()
+        d["key_set"] = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+        return d
 
     def generate(self, bundle: PromptBundle, n: int = 1) -> list[GeneratedImage]:
         try:
@@ -31,7 +43,7 @@ class GeminiProvider(Provider):
             raise ProviderError("GEMINI_API_KEY is not set (see .env.example)")
 
         client = genai.Client(api_key=api_key)
-        model = self.options.get("model", "gemini-3-pro-image")
+        model = self.options.get("model", self.default_model)
 
         parts: list = [self.text_prompt(bundle)]
         for path in self.reference_paths(bundle):

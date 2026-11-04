@@ -89,6 +89,80 @@ def project(start: Path | None = None) -> Project:
     return Project(root)
 
 
+# -- generation settings -------------------------------------------------
+#
+# "Which painter" is a setting of whoever runs stylelock (a person, or an orchestrator's
+# connector), not of the agent writing briefs. So it lives in the environment:
+#   STYLELOCK_PROVIDER  openai | gemini | replicate | openai-compatible | dryrun
+#   STYLELOCK_MODEL     model id for that provider
+# Precedence everywhere: explicit argument > environment (incl. .env files) > style guide.
+
+PROVIDER_ENV = "STYLELOCK_PROVIDER"
+MODEL_ENV = "STYLELOCK_MODEL"
+SETTABLE = {  # `stylelock config set <name> <value>` -> env var
+    "provider": PROVIDER_ENV,
+    "model": MODEL_ENV,
+    "base-url": "STYLELOCK_COMPAT_BASE_URL",
+    "max-images": "STYLELOCK_MAX_IMAGES",
+}
+
+
+def resolve_generation(provider: str | None = None, options: dict | None = None) -> tuple[str, dict, dict]:
+    """(provider, options, sources). `STYLELOCK_MODEL` only applies to the provider it was
+    configured for - an explicit `--provider gemini` must not inherit an OpenAI model id."""
+    env_provider = os.getenv(PROVIDER_ENV) or None
+    name = provider or env_provider or "dryrun"
+    opts = dict(options or {})
+    sources = {"provider": "argument" if provider else ("env" if env_provider else "default")}
+    env_model = os.getenv(MODEL_ENV)
+    if "model" in opts:
+        sources["model"] = "argument"
+    elif env_model and (provider is None or provider == env_provider):
+        opts["model"] = env_model
+        sources["model"] = "env"
+    else:
+        sources["model"] = "guide"
+    return name, opts, sources
+
+
+def write_env_value(path: Path, key: str, value: str) -> None:
+    """Set KEY=value in a .env file, replacing an existing line. The file is kept 0600."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = path.read_text().splitlines() if path.exists() else []
+    out, done = [], False
+    for line in lines:
+        if line.split("=", 1)[0].strip() == key:
+            if not done:
+                out.append(f"{key}={value}")
+                done = True
+            continue
+        out.append(line)
+    if not done:
+        out.append(f"{key}={value}")
+    path.write_text("\n".join(out) + "\n")
+    path.chmod(0o600)
+
+
+def env_sources(names: list[str]) -> dict[str, str]:
+    """Where each variable's value comes from: 'environment', a file path, or 'unset'.
+    Call before load_dotenv() to tell the real environment apart from .env files."""
+    root = find_root()
+    files = ([root / ".env"] if root else []) + [USER_ENV_FILE]
+    out = {}
+    for name in names:
+        src = "environment" if name in os.environ else "unset"
+        if src == "unset":
+            for f in files:
+                if f.exists() and any(
+                    line.split("=", 1)[0].strip() == name and line.split("=", 1)[1].strip()
+                    for line in f.read_text().splitlines() if "=" in line
+                ):
+                    src = str(f)
+                    break
+        out[name] = src
+    return out
+
+
 def load_dotenv() -> None:
     """Load the project's `.env`, then `~/.config/stylelock/.env`. Values already in the
     environment win, and the project file wins over the user-wide one."""

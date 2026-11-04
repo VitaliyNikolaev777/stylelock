@@ -55,14 +55,32 @@ RICH = {
 }
 
 
+_ENV = ("OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "REPLICATE_API_TOKEN",
+        "STYLELOCK_PROVIDER", "STYLELOCK_MODEL", "STYLELOCK_COMPAT_BASE_URL",
+        "STYLELOCK_COMPAT_API_KEY", "STYLELOCK_MAX_IMAGES", "STYLELOCK_HOME")
+
+
+@pytest.fixture(autouse=True)
+def isolated_env(tmp_path, monkeypatch):
+    """No test may see the developer's real keys, settings or ~/.config/stylelock/.env."""
+    import stylelock.cli as cli
+    import stylelock.config as config
+
+    for var in _ENV:
+        monkeypatch.delenv(var, raising=False)
+    user_env = tmp_path / "user-config" / ".env"
+    monkeypatch.setattr(config, "USER_ENV_FILE", user_env)
+    monkeypatch.setattr(cli, "USER_ENV_FILE", user_env)
+    monkeypatch.chdir(tmp_path)
+    return user_env
+
+
 @pytest.fixture
 def project(tmp_path, monkeypatch):
     """A fresh project made by `stylelock init`, with STYLELOCK_HOME pointing at it."""
     root = tmp_path / "proj"
     assert main(["init", str(root)]) == 0
     monkeypatch.setenv("STYLELOCK_HOME", str(root))
-    for var in ("OPENAI_API_KEY", "GEMINI_API_KEY", "REPLICATE_API_TOKEN"):
-        monkeypatch.delenv(var, raising=False)
     return root
 
 

@@ -15,7 +15,7 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .config import load_dotenv, project
+from .config import load_dotenv, project, resolve_generation
 from .manifest import Library
 from .prompt import PromptBundle, assemble
 from .providers import get_provider
@@ -28,7 +28,7 @@ class DraftGuideError(Exception):
 
 def run(
     subject: str,
-    provider: str = "dryrun",
+    provider: str | None = None,
     style_version: str | None = None,
     variant: str | None = None,
     asset_type: str | None = None,
@@ -42,8 +42,12 @@ def run(
     out_dir: Path | None = None,
     provider_options: dict | None = None,
 ) -> list[Path]:
-    """Generate `n` images for `subject` and return the paths written."""
+    """Generate `n` images for `subject` and return the paths written.
+
+    `provider` defaults to STYLELOCK_PROVIDER, then `dryrun`; the model to STYLELOCK_MODEL
+    (for that provider), then the guide's provider_defaults."""
     load_dotenv()
+    provider, provider_options, _ = resolve_generation(provider, provider_options)
     proj = project()
     proj.ensure_dirs()
 
@@ -56,7 +60,7 @@ def run(
     if guide.status == "draft" and not allow_draft:
         raise DraftGuideError(
             f"{guide.label} is still status=draft. Fill in the real values (or pass "
-            "--allow-draft to generate against placeholders anyway)."
+            "allow_draft / --allow-draft to generate against placeholders anyway)."
         )
     if guide.status == "deprecated":
         print(f"warning: {guide.label} is deprecated")
@@ -76,7 +80,7 @@ def run(
     )
 
     options = guide.provider_defaults(provider)
-    options.update(provider_options or {})
+    options.update(provider_options)
     impl = get_provider(provider, **options)
 
     if bundle.references and not impl.supports_reference_images:

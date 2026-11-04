@@ -18,6 +18,13 @@ class OpenAIImagesProvider(Provider):
     name = "openai"
     supports_reference_images = True
     supports_negative_prompt = False
+    supports_transparency = True
+    key_env = "OPENAI_API_KEY"
+    default_model = "gpt-image-1.5"
+    notes = (
+        "references go through images.edit. gpt-image-2 has no transparent background: "
+        "render opaque onto flat #00FF00 and key it out (chroma_key.py)"
+    )
 
     # `background: transparent` is what makes the icon/object types usable as
     # app assets - it requires png or webp output.
@@ -33,7 +40,7 @@ class OpenAIImagesProvider(Provider):
             raise ProviderError("OPENAI_API_KEY is not set (see .env.example)")
 
         client = OpenAI()
-        model = self.options.get("model", "gpt-image-1.5")
+        model = self.options.get("model", self.default_model)
         prompt = self.text_prompt(bundle)
         refs = self.reference_paths(bundle)
 

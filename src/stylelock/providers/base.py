@@ -22,9 +22,31 @@ class Provider:
     name: str = "base"
     supports_reference_images: bool = False
     supports_negative_prompt: bool = False
+    # whether the API can return an alpha channel; per-model exceptions go in `notes`
+    supports_transparency: bool = False
+    # env var holding the API key, or None when no key is needed
+    key_env: str | None = None
+    default_model: str = ""
+    notes: str = ""
 
     def __init__(self, **options):
         self.options = options
+
+    @classmethod
+    def describe(cls) -> dict:
+        """What this provider can do - for settings screens and for the agent's planning."""
+        import os
+
+        return {
+            "name": cls.name,
+            "default_model": cls.default_model,
+            "key_env": cls.key_env,
+            "key_set": bool(os.getenv(cls.key_env)) if cls.key_env else True,
+            "supports_reference_images": cls.supports_reference_images,
+            "supports_negative_prompt": cls.supports_negative_prompt,
+            "supports_transparency": cls.supports_transparency,
+            "notes": cls.notes,
+        }
 
     def generate(self, bundle: PromptBundle, n: int = 1) -> list[GeneratedImage]:
         raise NotImplementedError

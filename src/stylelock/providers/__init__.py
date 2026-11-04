@@ -5,12 +5,16 @@ from __future__ import annotations
 from .base import GeneratedImage, Provider, ProviderError
 from .dryrun import DryRunProvider
 from .gemini import GeminiProvider
+from .openai_compatible import OpenAICompatibleProvider
 from .openai_images import OpenAIImagesProvider
 from .replicate_flux import ReplicateFluxProvider
 
 REGISTRY: dict[str, type[Provider]] = {
     p.name: p
-    for p in (DryRunProvider, OpenAIImagesProvider, GeminiProvider, ReplicateFluxProvider)
+    for p in (
+        DryRunProvider, OpenAIImagesProvider, OpenAICompatibleProvider,
+        GeminiProvider, ReplicateFluxProvider,
+    )
 }
 
 
@@ -24,4 +28,8 @@ def get_provider(name: str, **options) -> Provider:
     return cls(**options)
 
 
-__all__ = ["REGISTRY", "get_provider", "Provider", "ProviderError", "GeneratedImage"]
+def describe_all() -> list[dict]:
+    return [REGISTRY[name].describe() for name in sorted(REGISTRY)]
+
+
+__all__ = ["REGISTRY", "describe_all", "get_provider", "Provider", "ProviderError", "GeneratedImage"]

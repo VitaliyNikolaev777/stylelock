@@ -29,9 +29,12 @@ the anchors and the provenance record - the entire point of the setup.
 2. `stylelock doctor`. It finds the project from the current folder upward, or from
    `STYLELOCK_HOME`. If there is none, ask the user where their art project should live and
    run `stylelock init <dir>`.
-3. API key: ask the user to put it in the project's `.env` (template in `.env.example`) or in
-   `~/.config/stylelock/.env` for all projects. Don't ask them to paste a key into chat.
-   `--provider dryrun` needs no key and is fine for checking the plumbing.
+3. Provider and key. Which image model paints is the user's setting:
+   `stylelock config set provider openai` (optionally `config set model <id>`). For the key,
+   ask the user to run `stylelock config set-key openai` in their own terminal. It prompts
+   for the key and stores it with mode 600. Don't ask them to paste a key into chat.
+   `stylelock providers` shows what each provider can do (references, transparency) and
+   whether its key is set. `--provider dryrun` needs no key and is fine for checking the plumbing.
 
 ## A new project has no style yet - build it from their art
 
@@ -118,6 +121,8 @@ with any Python that has Pillow. Each script's docstring says when to use it.
 ```
 stylelock init [dir]                         new project
 stylelock doctor                             what's set up, what's missing
+stylelock providers                          capabilities and key status per provider
+stylelock config show|set|set-key            provider/model defaults, API keys
 stylelock style list|lint|render|show|bump|variants|types|cast
 stylelock refs list|add|validate
 stylelock generate "<subject>" [--type T] [--variant V] [--character C]
@@ -125,3 +130,5 @@ stylelock generate "<subject>" [--type T] [--variant V] [--character C]
                    [--roles anchor,subject] [--ref-ids id1,id2] [--option key=value]
 stylelock review pending|accept|reject|report|reasons
 ```
+
+Add `--json` to any of these for output you can parse reliably.

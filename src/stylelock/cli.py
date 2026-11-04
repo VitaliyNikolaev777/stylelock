@@ -3,19 +3,28 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
-import shutil
+import os
 import sys
 from datetime import date
 from pathlib import Path
 
-from . import __version__
-from .config import ProjectNotFound, is_project, load_dotenv, project
-from .generate import DraftGuideError, run
-from .manifest import KNOWN_ROLES, Library, ManifestError, Reference
-from .prompt import assemble
+from . import __version__, service
+from .config import (
+    SETTABLE,
+    USER_ENV_FILE,
+    ProjectNotFound,
+    env_sources,
+    find_root,
+    is_project,
+    load_dotenv,
+    write_env_value,
+)
+from .generate import DraftGuideError
+from .manifest import KNOWN_ROLES, ManifestError
 from .providers import REGISTRY, ProviderError
-from .review import REASONS, ReviewError, accept, pending, reject, report
+from .review import ReviewError
 from .style import StyleError, StyleGuide, list_versions
 
 
@@ -25,6 +34,16 @@ def _split(value: str | None) -> list[str] | None:
     return [v.strip() for v in value.split(",") if v.strip()]
 
 
+def _emit(a: argparse.Namespace, data, text=None) -> None:
+    """`--json` prints data; otherwise `text(data)` (or the data itself) for humans."""
+    if getattr(a, "json", False):
+        print(json.dumps(data, indent=2, default=str))
+    elif text is not None:
+        text(data)
+    else:
+        print(data if isinstance(data, str) else json.dumps(data, indent=2, default=str))
+
+
 # -- generate ------------------------------------------------------------
 
 def cmd_generate(a: argparse.Namespace) -> int:
@@ -32,49 +51,37 @@ def cmd_generate(a: argparse.Namespace) -> int:
     for kv in a.option or []:
         key, _, val = kv.partition("=")
         opts[key.strip()] = _coerce(val.strip())
+    if a.model:
+        opts["model"] = a.model
+
+    brief = dict(
+        style_version=a.style_version, variant=a.variant, asset_type=a.type,
+        character=a.character, roles=_split(a.roles), tags=_split(a.tags),
+        ref_ids=_split(a.ref_ids), extra=a.extra,
+    )
 
     if a.dry_run:
-        guide = (
-            StyleGuide.load(a.style_version)
-            .with_variant(a.variant)
-            .with_type(a.type)
-            .with_character(a.character)
-        )
-        bundle = assemble(
-            a.subject, guide, Library.load(),
-            roles=_split(a.roles), tags=_split(a.tags), ref_ids=_split(a.ref_ids), extra=a.extra,
-        )
-        print(bundle.prompt)
-        print("\n--- negative ---")
-        print(", ".join(bundle.negative) or "(none)")
-        print("\n--- references ---")
-        for r in bundle.references:
-            print(f"  {r.id} [{r.role}] {r.file}")
-        print(f"\nstyle: {guide.label}  fingerprint: {bundle.fingerprint}")
+        def show(d):
+            print(d["prompt"])
+            print("\n--- negative ---")
+            print(", ".join(d["negative"]) or "(none)")
+            print("\n--- references ---")
+            for r in d["references"]:
+                print(f"  {r['id']} [{r['role']}] {r['file']}")
+            print(f"\nstyle: {d['style']}  fingerprint: {d['fingerprint']}")
+        _emit(a, service.preview(a.subject, **brief), show)
         return 0
 
     try:
-        paths = run(
-            subject=a.subject,
-            provider=a.provider,
-            style_version=a.style_version,
-            variant=a.variant,
-            asset_type=a.type,
-            character=a.character,
-            roles=_split(a.roles),
-            tags=_split(a.tags),
-            ref_ids=_split(a.ref_ids),
-            extra=a.extra,
-            n=a.n,
-            allow_draft=a.allow_draft,
-            provider_options=opts,
+        results = service.generate(
+            a.subject, provider=a.provider, n=a.n, allow_draft=a.allow_draft,
+            provider_options=opts, **brief,
         )
     except DraftGuideError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
 
-    for p in paths:
-        print(p)
+    _emit(a, results, lambda rs: [print(r["image"]) for r in rs])
     return 0
 
 
@@ -95,31 +102,28 @@ def _coerce(v: str):
 
 def cmd_style(a: argparse.Namespace) -> int:
     if a.style_action == "list":
+        rows = []
         for num, path in list_versions():
             g = StyleGuide(path=path, data=json.loads(path.read_text()))
-            print(f"v{num:<3} {g.version:<8} {g.status:<11} {path.name}")
+            rows.append({"n": num, "version": g.version, "status": g.status, "file": path.name})
+        _emit(a, rows, lambda rs: [
+            print(f"v{r['n']:<3} {r['version']:<8} {r['status']:<11} {r['file']}") for r in rs
+        ])
+        return 0
+
+    if a.style_action in {"variants", "types", "cast"}:
+        info = service.style_info(a.style_version)
+        section = info[a.style_action]
+
+        def show(sec):
+            if not sec:
+                print(f"(this guide defines no {a.style_action})")
+            for name, desc in sec.items():
+                print(f"{name:<14} {desc}")
+        _emit(a, section, show)
         return 0
 
     guide = StyleGuide.load(a.style_version)
-
-    if a.style_action == "cast":
-        if not guide.cast:
-            print("(this guide defines no cast)")
-        for name, c in guide.cast.items():
-            print(f"{name:<10} {c.get('description', '')}")
-            print(f"{'':<10} {c.get('appearance', '')}")
-        return 0
-
-    if a.style_action in {"variants", "types"}:
-        section = guide.variants if a.style_action == "variants" else guide.types
-        if not section:
-            print(f"(this guide defines no {a.style_action})")
-        for name, v in section.items():
-            tags = ", ".join(v.get("reference_tags", [])) or "inherits"
-            print(f"{name:<10} {v.get('description', '')}")
-            print(f"{'':<10} reference tags: {tags}")
-        return 0
-
     if a.style_action in {"show", "render"}:
         # only the read-only views resolve overlays; lint and bump work on the base spec
         guide = guide.with_variant(a.variant).with_type(a.type).with_character(a.character)
@@ -133,16 +137,20 @@ def cmd_style(a: argparse.Namespace) -> int:
         return 0
 
     if a.style_action == "lint":
-        problems = guide.validate()
-        for w in guide.warnings():
-            print(f"  warning: {w}")
-        if problems:
-            print(f"{guide.label}: {len(problems)} problem(s)")
-            for p in problems:
-                print(f"  - {p}")
-            return 1
-        print(f"{guide.label}: ok" + (" (status=draft)" if guide.status == "draft" else ""))
-        return 0
+        problems, warnings = guide.validate(), guide.warnings()
+
+        def show(d):
+            for w in d["warnings"]:
+                print(f"  warning: {w}")
+            if d["problems"]:
+                print(f"{d['guide']}: {len(d['problems'])} problem(s)")
+                for p in d["problems"]:
+                    print(f"  - {p}")
+            else:
+                print(f"{d['guide']}: ok" + (" (status=draft)" if d["status"] == "draft" else ""))
+        _emit(a, {"guide": guide.label, "status": guide.status,
+                  "problems": problems, "warnings": warnings}, show)
+        return 1 if problems else 0
 
     if a.style_action == "bump":
         versions = list_versions()
@@ -167,57 +175,44 @@ def cmd_style(a: argparse.Namespace) -> int:
 # -- refs ----------------------------------------------------------------
 
 def cmd_refs(a: argparse.Namespace) -> int:
-    lib = Library.load()
-
     if a.refs_action == "list":
-        refs = lib.select(roles=_split(a.roles), tags=_split(a.tags), include_disabled=True)
-        if not refs:
-            print("(no references match)")
-        for r in refs:
-            flag = "on " if r.enabled else "off"
-            print(f"[{flag}] {r.id:<28} {r.role:<12} {r.file}")
-            if r.demonstrates:
-                print(f"      {r.demonstrates}")
+        def show(rows):
+            if not rows:
+                print("(no references match)")
+            for r in rows:
+                flag = "on " if r["enabled"] else "off"
+                print(f"[{flag}] {r['id']:<28} {r['role']:<12} {r['file']}")
+                if r["demonstrates"]:
+                    print(f"      {r['demonstrates']}")
+        _emit(a, service.references(_split(a.roles), _split(a.tags)), show)
         return 0
 
     if a.refs_action == "validate":
-        guide = StyleGuide.load()
-        problems = lib.validate(
-            anchor_limit=guide.anchor_limit, tag_groups=guide.reference_tag_groups()
-        )
-        if problems:
-            print(f"{len(problems)} problem(s):")
-            for p in problems:
+        problems = service.validate_references()
+
+        def show(ps):
+            if not ps:
+                print("reference library ok")
+                return
+            print(f"{len(ps)} problem(s):")
+            for p in ps:
                 print(f"  - {p}")
-            return 1
-        print("reference library ok")
-        return 0
+        _emit(a, problems, show)
+        return 1 if problems else 0
 
     if a.refs_action == "add":
-        src = Path(a.path).expanduser().resolve()
-        if not src.exists():
-            print(f"error: {src} not found", file=sys.stderr)
+        if not a.path:
+            print("error: refs add needs an image path", file=sys.stderr)
+            return 2
+        try:
+            ref = service.add_reference(
+                a.path, role=a.role, demonstrates=a.demonstrates, tags=_split(a.tags),
+                exclude=_split(a.exclude), ref_id=a.id, force=a.force,
+            )
+        except (FileNotFoundError, FileExistsError) as e:
+            print(f"error: {e}", file=sys.stderr)
             return 1
-        dest_dir = lib.root / (a.role + "s" if a.role == "anchor" else a.role)
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        dest = dest_dir / src.name
-        if dest.exists() and not a.force:
-            print(f"error: {dest} exists (use --force)", file=sys.stderr)
-            return 1
-        shutil.copy2(src, dest)
-
-        ref = Reference(
-            id=a.id or dest.stem,
-            file=dest.relative_to(lib.root).as_posix(),
-            role=a.role,
-            tags=_split(a.tags) or [],
-            demonstrates=a.demonstrates,
-            exclude=_split(a.exclude) or [],
-            added=date.today().isoformat(),
-        )
-        lib.add(ref)
-        lib.save()
-        print(f"added {ref.id} -> {ref.file}")
+        _emit(a, ref, lambda r: print(f"added {r['id']} -> {r['file']}"))
         return 0
 
     return 1
@@ -227,100 +222,192 @@ def cmd_refs(a: argparse.Namespace) -> int:
 
 def cmd_review(a: argparse.Namespace) -> int:
     if a.review_action == "pending":
-        items = pending()
-        for p in items:
-            print(p)
-        if not items:
-            print("(nothing unreviewed)")
+        def show(rows):
+            for r in rows:
+                print(r["image"])
+            if not rows:
+                print("(nothing unreviewed)")
+        _emit(a, service.pending(), show)
         return 0
 
     if a.review_action == "reasons":
-        for k, v in sorted(REASONS.items()):
-            print(f"{k:<16} {v}")
+        _emit(a, service.reasons(), lambda d: [print(f"{k:<16} {v}") for k, v in d.items()])
         return 0
 
+    if a.review_action in {"accept", "reject"} and not a.image:
+        print(f"error: review {a.review_action} needs an image path", file=sys.stderr)
+        return 2
+
     if a.review_action == "accept":
-        accept(Path(a.image), note=a.note)
-        print(f"accepted {a.image}")
+        _emit(a, service.accept(a.image, a.note), lambda d: print(f"accepted {d['image']}"))
         return 0
 
     if a.review_action == "reject":
-        dest = reject(Path(a.image), reasons=_split(a.reasons) or [], note=a.note)
-        print(f"rejected -> {dest}")
+        d = service.reject(a.image, _split(a.reasons) or [], a.note)
+        _emit(a, d, lambda d: print(f"rejected -> {d['moved_to']}"))
         return 0
 
     if a.review_action == "report":
-        r = report(min_hits=a.min_hits)
-        print(f"rejects logged: {r['total_rejects']}")
-        if r["by_reason"]:
-            print("\nby reason:")
-            for k, v in r["by_reason"].items():
-                print(f"  {v:>3}  {k}")
-        if r["by_reference"]:
-            print("\nreferences attached to rejects:")
-            for k, v in r["by_reference"].items():
-                print(f"  {v:>3}  {k}")
-        if r["suggested_actions"]:
-            print("\nsuggested actions:")
-            for s in r["suggested_actions"]:
-                print(f"  - {s}")
-        elif r["total_rejects"]:
-            print(f"\n(no reason has hit the {a.min_hits}x threshold yet)")
+        def show(r):
+            print(f"rejects logged: {r['total_rejects']}")
+            if r["by_reason"]:
+                print("\nby reason:")
+                for k, v in r["by_reason"].items():
+                    print(f"  {v:>3}  {k}")
+            if r["by_reference"]:
+                print("\nreferences attached to rejects:")
+                for k, v in r["by_reference"].items():
+                    print(f"  {v:>3}  {k}")
+            if r["suggested_actions"]:
+                print("\nsuggested actions:")
+                for s in r["suggested_actions"]:
+                    print(f"  - {s}")
+            elif r["total_rejects"]:
+                print(f"\n(no reason has hit the {a.min_hits}x threshold yet)")
+        _emit(a, service.report(a.min_hits), show)
         return 0
 
     return 1
 
 
-def cmd_doctor(_: argparse.Namespace) -> int:
-    import os
+# -- doctor / providers / config -----------------------------------------
 
-    load_dotenv()
-    ok = True
+def cmd_doctor(a: argparse.Namespace) -> int:
+    s = service.status()
 
-    print(f"project     : {project().root}")
-    guide = StyleGuide.load()
-    problems = guide.validate()
-    print(f"style guide : {guide.label} status={guide.status} "
-          f"{'ok' if not problems else f'{len(problems)} problem(s)'}")
-    ok &= not problems
+    def show(s):
+        g = s["guide"]
+        print(f"project     : {s['project']}")
+        gp = "ok" if not g["problems"] else f"{len(g['problems'])} problem(s)"
+        print(f"style guide : {g['label']} status={g['status']} {gp}")
+        for p in g["problems"]:
+            print(f"                - {p}")
+        if g["variants"]:
+            print(f"variants    : {', '.join(g['variants'])}")
+        if g["types"]:
+            print(f"asset types : {', '.join(g['types'])}")
+        r = s["references"]
+        rp = "ok" if not r["problems"] else f"{len(r['problems'])} problem(s)"
+        print(f"references  : {r['enabled_anchors']} enabled anchor(s), {rp}")
+        gen = s["generation"]
+        caps = gen["capabilities"] or {}
+        key = "no key needed" if not caps.get("key_env") else (
+            "key set" if caps.get("key_set") else f"{caps['key_env']} missing")
+        print(f"generation  : {gen['provider']} / {gen['model'] or '?'} "
+              f"(provider from {gen['sources']['provider']}, model from {gen['sources']['model']}; {key})")
+        print(f"review      : {s['unreviewed']} unreviewed, {s['rejects_logged']} rejects logged")
+        for w in g["warnings"]:
+            print(f"warning     : {w}")
+        for step in s["next_steps"]:
+            print(f"next        : {step}")
 
-    if guide.variants:
-        print(f"variants    : {', '.join(sorted(guide.variants))}")
-    if guide.types:
-        print(f"asset types : {', '.join(sorted(guide.types))}")
+    _emit(a, s, show)
+    return 0 if s["ok"] else 1
 
-    lib = Library.load()
-    ref_problems = lib.validate(
-        anchor_limit=guide.anchor_limit, tag_groups=guide.reference_tag_groups()
-    )
-    anchors = len(lib.select(roles=["anchor"]))
-    print(f"references  : {anchors} enabled anchor(s), "
-          f"{'ok' if not ref_problems else f'{len(ref_problems)} problem(s)'}")
-    ok &= not ref_problems
 
-    keys = {
-        "openai": "OPENAI_API_KEY",
-        "gemini": "GEMINI_API_KEY",
-        "replicate": "REPLICATE_API_TOKEN",
-    }
-    print("providers   :")
-    for name in sorted(REGISTRY):
-        env = keys.get(name)
+def cmd_providers(a: argparse.Namespace) -> int:
+    def show(rows):
+        for p in rows:
+            key = "no key needed" if not p["key_env"] else (
+                "key set" if p["key_set"] else f"{p['key_env']} missing")
+            caps = ", ".join(
+                label for flag, label in (
+                    ("supports_reference_images", "references"),
+                    ("supports_transparency", "transparency"),
+                    ("supports_negative_prompt", "negative prompt"),
+                ) if p[flag]
+            ) or "text only"
+            print(f"{p['name']:<18} {p['default_model'] or '-':<32} {key}")
+            print(f"{'':<18} {caps}")
+            if p["notes"]:
+                print(f"{'':<18} {p['notes']}")
+    _emit(a, service.providers(), show)
+    return 0
+
+
+def cmd_config(a: argparse.Namespace) -> int:
+    target = (find_root() / ".env") if a.project and find_root() else USER_ENV_FILE
+    if a.project and not find_root():
+        raise ProjectNotFound("--project needs to run inside a stylelock project")
+
+    if a.config_action == "show":
+        names = sorted({*SETTABLE.values(), *(p.key_env for p in REGISTRY.values() if p.key_env)})
+        sources = env_sources(names)
+        load_dotenv()
+        data = {
+            "files": {"project": str(find_root() / ".env") if find_root() else None,
+                      "user": str(USER_ENV_FILE)},
+            "values": {
+                n: {"source": sources[n],
+                    "value": (_mask(os.environ.get(n, "")) if n.endswith(("_KEY", "_TOKEN"))
+                              else os.environ.get(n, ""))}
+                for n in names
+            },
+        }
+        if find_root():
+            data["generation"] = service.generation_config()
+
+        def show(d):
+            print(f"project .env : {d['files']['project'] or '(not in a project)'}")
+            print(f"user .env    : {d['files']['user']}")
+            for n, v in d["values"].items():
+                shown = v["value"] or "-"
+                print(f"  {n:<28} {shown:<34} {v['source']}")
+            if "generation" in d:
+                g = d["generation"]
+                print(f"\ngenerate would use: {g['provider']} / {g['model'] or '?'}")
+        _emit(a, data, show)
+        return 0
+
+    if a.config_action == "set":
+        env = SETTABLE.get(a.name)
         if env is None:
-            print(f"  {name:<10} ready (no key needed)")
-        else:
-            print(f"  {name:<10} {'key set' if os.getenv(env) else f'{env} missing'}")
+            print(f"error: can set {', '.join(SETTABLE)} (keys go through `config set-key`)",
+                  file=sys.stderr)
+            return 2
+        if a.name == "provider" and a.value not in REGISTRY:
+            print(f"error: unknown provider {a.value!r} (available: {', '.join(sorted(REGISTRY))})",
+                  file=sys.stderr)
+            return 2
+        write_env_value(target, env, a.value)
+        print(f"{env}={a.value} -> {target}")
+        return 0
 
-    print(f"rejects     : {report()['total_rejects']} logged")
-    for w in guide.warnings():
-        print(f"warning     : {w}")
-    if guide.status == "draft":
-        print("\nnext: review the style guide, fix anything that reads wrong, "
-              "then set status to active")
-    if not anchors:
-        print("next: add 2-5 approved on-style images with "
-              "`stylelock refs add <file> --role anchor --demonstrates '...'`")
-    return 0 if ok else 1
+    if a.config_action == "set-key":
+        cls = REGISTRY.get(a.name)
+        if cls is None or not cls.key_env:
+            keyed = sorted(n for n, p in REGISTRY.items() if p.key_env)
+            print(f"error: providers with keys: {', '.join(keyed)}", file=sys.stderr)
+            return 2
+        # never from argv - it would land in shell history and process listings
+        value = getpass.getpass(f"{cls.key_env}: ") if sys.stdin.isatty() else sys.stdin.readline()
+        value = value.strip()
+        if not value:
+            print("error: empty key, nothing written", file=sys.stderr)
+            return 2
+        write_env_value(target, cls.key_env, value)
+        print(f"{cls.key_env} saved to {target} (mode 600)")
+        return 0
+
+    return 1
+
+
+def _mask(v: str) -> str:
+    return "" if not v else (v[:3] + "…" + v[-4:] if len(v) > 10 else "set")
+
+
+# -- instructions / mcp --------------------------------------------------
+
+def cmd_instructions(a: argparse.Namespace) -> int:
+    print(service.read_doc(a.doc))
+    return 0
+
+
+def cmd_mcp(a: argparse.Namespace) -> int:
+    from .mcp_server import serve
+
+    serve(a.project, a.max_images)
+    return 0
 
 
 # -- init ----------------------------------------------------------------
@@ -375,7 +462,7 @@ def cmd_init(a: argparse.Namespace) -> int:
         print(f"  = {rel} (already existed, left as is)")
     print(
         "\nnext:\n"
-        "  1. put an API key in .env (see .env.example) or ~/.config/stylelock/.env\n"
+        "  1. stylelock config set provider openai && stylelock config set-key openai\n"
         "  2. describe your style in style/style-guide-v1.json, then set status to active\n"
         "  3. add 2-5 approved images: stylelock refs add <file> --role anchor --demonstrates '...'\n"
         "  4. stylelock doctor"
@@ -383,48 +470,49 @@ def cmd_init(a: argparse.Namespace) -> int:
     return 0
 
 
+# -- parser --------------------------------------------------------------
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="stylelock", description=__doc__)
     p.add_argument("--version", action="version", version=f"stylelock {__version__}")
     sub = p.add_subparsers(dest="command", required=True)
 
+    js = argparse.ArgumentParser(add_help=False)
+    js.add_argument("--json", action="store_true", help="machine-readable output")
+
     i = sub.add_parser("init", help="create a new project (style guide, reference library, folders)")
     i.add_argument("dir", nargs="?", default=".", help="where to create it (default: here)")
     i.set_defaults(func=cmd_init)
 
-    g = sub.add_parser("generate", help="generate images through the style wrapper")
+    g = sub.add_parser("generate", parents=[js], help="generate images through the style wrapper")
     g.add_argument("subject", help="what to depict - the subject only, never the style")
-    g.add_argument("--provider", default="dryrun", choices=sorted(REGISTRY))
-    g.add_argument("--style-version", default=None, help="e.g. 1 (default: latest)")
+    g.add_argument("--provider", default=None, choices=sorted(REGISTRY),
+                   help="default: STYLELOCK_PROVIDER, else dryrun")
+    g.add_argument("--model", default=None, help="default: STYLELOCK_MODEL, else the guide's")
+    g.add_argument("--style-version", default=None, help="e.g. 1, or a path to a guide .json")
     g.add_argument("--variant", default=None, help="which world (see `stylelock style variants`)")
     g.add_argument("--type", default=None, help="what kind of asset (see `stylelock style types`)")
-    g.add_argument(
-        "--character",
-        default=None,
-        help="lock a named cast member into the prompt (see `stylelock style cast`)",
-    )
+    g.add_argument("--character", default=None, help="lock a cast member (see `stylelock style cast`)")
     g.add_argument("--roles", default=None, help="reference roles, comma separated (default: anchor)")
     g.add_argument("--tags", default=None, help="require all these tags on references")
     g.add_argument("--ref-ids", default=None, help="use exactly these reference ids")
-    g.add_argument("--extra", default="", help="extra per-image direction, appended after the style block")
+    g.add_argument("--extra", default="", help="per-image direction, appended after the style block")
     g.add_argument("-n", type=int, default=1)
     g.add_argument("--allow-draft", action="store_true", help="generate against a draft guide")
     g.add_argument("--dry-run", action="store_true", help="print the assembled prompt and exit")
     g.add_argument("--option", action="append", help="provider option, key=value (repeatable)")
     g.set_defaults(func=cmd_generate)
 
-    s = sub.add_parser("style", help="inspect and version the style spec")
-    s.add_argument(
-        "style_action",
-        choices=["show", "render", "lint", "list", "bump", "variants", "types", "cast"],
-    )
+    s = sub.add_parser("style", parents=[js], help="inspect and version the style spec")
+    s.add_argument("style_action",
+                   choices=["show", "render", "lint", "list", "bump", "variants", "types", "cast"])
     s.add_argument("--style-version", default=None)
     s.add_argument("--variant", default=None)
     s.add_argument("--type", default=None)
     s.add_argument("--character", default=None)
     s.set_defaults(func=cmd_style)
 
-    r = sub.add_parser("refs", help="manage the reference library")
+    r = sub.add_parser("refs", parents=[js], help="manage the reference library")
     r.add_argument("refs_action", choices=["list", "add", "validate"])
     r.add_argument("path", nargs="?", help="image to add")
     r.add_argument("--role", default="anchor", choices=KNOWN_ROLES)
@@ -436,7 +524,7 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--force", action="store_true")
     r.set_defaults(func=cmd_refs)
 
-    v = sub.add_parser("review", help="accept/reject outputs and mine the failures")
+    v = sub.add_parser("review", parents=[js], help="accept/reject outputs and mine the failures")
     v.add_argument("review_action", choices=["pending", "accept", "reject", "report", "reasons"])
     v.add_argument("image", nargs="?")
     v.add_argument("--reasons", default=None, help="comma separated, see `stylelock review reasons`")
@@ -444,17 +532,44 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("--min-hits", type=int, default=3)
     v.set_defaults(func=cmd_review)
 
-    d = sub.add_parser("doctor", help="check the whole setup")
+    d = sub.add_parser("doctor", parents=[js], help="check the whole setup")
     d.set_defaults(func=cmd_doctor)
+
+    pr = sub.add_parser("providers", parents=[js], help="image providers, capabilities, key status")
+    pr.set_defaults(func=cmd_providers)
+
+    c = sub.add_parser("config", parents=[js], help="generation settings and API keys")
+    c.add_argument("config_action", choices=["show", "set", "set-key"])
+    c.add_argument("name", nargs="?", help=f"set: {', '.join(SETTABLE)}; set-key: a provider")
+    c.add_argument("value", nargs="?")
+    c.add_argument("--project", action="store_true",
+                   help="write to this project's .env instead of ~/.config/stylelock/.env")
+    c.set_defaults(func=cmd_config)
+
+    ins = sub.add_parser("instructions", help="print the workflow for an orchestrating model")
+    ins.add_argument("doc", nargs="?", default="agent", choices=service.DOCS)
+    ins.set_defaults(func=cmd_instructions)
+
+    m = sub.add_parser("mcp", help="run as an MCP server over stdio")
+    m.add_argument("--project", default=None, help="project folder (default: discovery)")
+    m.add_argument("--max-images", type=int, default=None, help="cap per session")
+    m.set_defaults(func=cmd_mcp)
 
     return p
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "config" and args.config_action in {"set", "set-key"} and not args.name:
+        print(f"error: config {args.config_action} needs a name", file=sys.stderr)
+        return 2
+    if args.command == "config" and args.config_action == "set" and args.value is None:
+        print("error: config set needs a value", file=sys.stderr)
+        return 2
     try:
         return args.func(args)
-    except (ProjectNotFound, StyleError, ManifestError, ProviderError, ReviewError, ValueError) as e:
+    except (ProjectNotFound, StyleError, ManifestError, ProviderError, ReviewError,
+            ValueError, FileNotFoundError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
 

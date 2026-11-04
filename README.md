@@ -39,8 +39,9 @@ stylelock --version
 
 Use `gemini` or `replicate` instead of `openai` if that is the user's provider. Without uv,
 use `pipx install` with the same spec. Then ask the user where their art project should live,
-and run `stylelock init <dir>` there. Ask them to put their API key in `<dir>/.env`
-themselves rather than pasting it into chat.
+and run `stylelock init <dir>` there. For the key, have the user run
+`stylelock config set-key openai` in their own terminal (it prompts for it), rather than
+pasting it into chat. Then set the provider with `stylelock config set provider openai`.
 
 ## Install by hand
 
@@ -57,7 +58,8 @@ To use the skill without the plugin system, copy `skills/stylelock/` to `~/.clau
 
 ```bash
 stylelock init my-art && cd my-art
-echo "OPENAI_API_KEY=sk-..." > .env
+stylelock config set provider openai          # which image model paints
+stylelock config set-key openai               # prompts for the key; stored 0600, never in argv
 stylelock doctor
 stylelock generate "a red bicycle" --type object --dry-run      # see the exact prompt, free
 stylelock generate "a red bicycle" --type object --allow-draft  # real call, against the draft
@@ -71,6 +73,56 @@ stylelock generate "a red bicycle" --type object --allow-draft  # real call, aga
 stylelock refs add hero.png --role anchor --demonstrates "flat fills, no outlines, the palette"
 stylelock style lint && stylelock refs validate
 ```
+
+## Use it from an orchestrator or any MCP host
+
+stylelock is model-agnostic on both sides. The **smart model** (planner, briefer, reviewer) can
+be anything that calls tools: Claude, GPT, Gemini, a local model. The **generation model** is a
+setting of whoever runs stylelock. The two never share a key.
+
+```bash
+uv tool install "stylelock[openai,mcp] @ git+https://github.com/VitaliyNikolaev777/stylelock"
+```
+
+Register it as an MCP server (stdio). For example, a connector definition:
+
+```json
+{
+  "command": "stylelock",
+  "args": ["mcp", "--project", "/path/to/my-art", "--max-images", "40"],
+  "env": {
+    "STYLELOCK_PROVIDER": "openai",
+    "STYLELOCK_MODEL": "gpt-image-1.5",
+    "OPENAI_API_KEY": "<from the host's secret store>"
+  }
+}
+```
+
+| Orchestrator setting | Goes to |
+|---|---|
+| smart model | whichever model the host connects to this server. It gets the workflow as the server's `instructions`. |
+| generation model | `STYLELOCK_PROVIDER` + `STYLELOCK_MODEL` in the server's env |
+| generation key | `OPENAI_API_KEY` / `GEMINI_API_KEY` / `REPLICATE_API_TOKEN` / `STYLELOCK_COMPAT_API_KEY` in the server's env |
+| self-hosted / proxy model | `STYLELOCK_PROVIDER=openai-compatible` + `STYLELOCK_COMPAT_BASE_URL` |
+
+What the server guarantees:
+
+- provider, model and key are fixed at launch. No tool can change them, and no tool result
+  contains a key.
+- one server serves one project, and every path argument must resolve inside it.
+- `--max-images` caps generation per session. The model gets a readable error and is told
+  to ask the user.
+- one line per tool call on stderr, for the host's log. The sidecars remain the durable record.
+- previews of generated images come back with the result, transparent ones over a
+  checkerboard, so a vision model can review them without a second call.
+
+Tools: `status`, `style_info`, `preview_prompt`, `generate`, `view_image`, `list_pending`,
+`accept`, `reject`, `review_reasons`, `review_report`, `list_references`, `add_reference`,
+`read_doc`.
+
+**No MCP?** Any agent with a shell can drive the CLI. Put `stylelock instructions` in its
+system prompt and have it use `--json` on every command. `stylelock providers --json` lists
+every image provider with its capabilities and key status, for a settings screen.
 
 ## A project
 
@@ -106,7 +158,11 @@ one renders. **hard_rules** render last on every prompt and no overlay may touch
 |---|---|
 | `stylelock init [dir]` | create a project |
 | `stylelock doctor` | check guide, library and provider keys |
-| `stylelock generate "<subject>"` | `--type --variant --character --extra --provider -n --dry-run --option k=v` |
+| `stylelock providers` | image providers, capabilities, whether a key is set |
+| `stylelock config show / set / set-key` | provider and model defaults, API keys |
+| `stylelock instructions [doc]` | the workflow for an orchestrating model |
+| `stylelock mcp --project DIR` | run as an MCP server over stdio |
+| `stylelock generate "<subject>"` | `--type --variant --character --extra --provider --model -n --dry-run --option k=v` |
 | `stylelock style list / lint / render / show / bump / variants / types / cast` | inspect and version the guide |
 | `stylelock refs list / add / validate` | manage the reference library |
 | `stylelock review pending / accept / reject / report / reasons` | the feedback loop |
@@ -117,6 +173,9 @@ one renders. **hard_rules** render last on every prompt and no overlay may touch
 uv venv && uv pip install -e ".[dev,tools]"
 .venv/bin/python -m pytest -q
 ```
+
+The reference docs live in `src/stylelock/docs/` (packaged, served over MCP). The skill keeps
+copies in `skills/stylelock/reference/`, and a test fails if they drift.
 
 Adding a provider means one file in `src/stylelock/providers/` subclassing `Provider`, plus a
 line in `providers/__init__.py`. Set `supports_reference_images` / `supports_negative_prompt`

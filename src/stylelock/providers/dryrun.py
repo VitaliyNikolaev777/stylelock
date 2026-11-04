@@ -14,6 +14,9 @@ class DryRunProvider(Provider):
     name = "dryrun"
     supports_reference_images = True
     supports_negative_prompt = True
+    supports_transparency = True
+    default_model = "placeholder"
+    notes = "no network, no key: writes a 64px placeholder so the pipeline can be exercised"
 
     def generate(self, bundle: PromptBundle, n: int = 1) -> list[GeneratedImage]:
         return [

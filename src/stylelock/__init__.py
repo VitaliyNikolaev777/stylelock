@@ -12,5 +12,5 @@ from .manifest import Library
 from .prompt import assemble
 from .style import StyleGuide
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = ["generate_image", "StyleGuide", "Library", "assemble", "__version__"]
